@@ -1,0 +1,101 @@
+def inf_s_img(model, noisy_image): #single
+    input_image = np.expand_dims(noisy_image, axis=0)
+    predicted_image = model.predict(input_image)
+    
+    return predicted_image[0]
+
+def inf_b_img(model, noisy_images): #batch
+    predicted_image = model.predict(noisy_images, batch_size=4)
+    return predicted_image
+
+def visualize_predictions(model, X_test, y_test, n):
+    random_numbers = random.choices(range(X_test.shape[0]), k=n)    # Get n random indices
+    for i in random_numbers:
+        noisy_image = X_test[i]
+        gt_image = y_test[i]
+        predicted_image = inf_s_img(model, X_test[i])
+        predicted_image/=255
+
+        f, ar = plt.subplots(1,3, figsize=(21,21))
+        ar[0].imshow(noisy_image)
+        ar[0].set_title("Noisy image")
+        ar[0].set_axis_off()
+        ar[1].imshow(gt_image)
+        ar[1].set_title("Ground truth image")
+        ar[1].set_axis_off()
+        ar[2].imshow(predicted_image)
+        ar[2].set_title("Predicted image")
+        ar[2].set_axis_off()
+
+best_models_path = "/content/drive/MyDrive/Colab Notebooks/Applied AI Assignments/Case Study 2 Image Denoising/Best Models/baseline model/"
+model = tf.keras.models.load_model(best_models_path+'best_REDNet_blindnoise_256x256.h5')
+
+visualize_predictions(model, n_test_img, g_test_img, 10)
+
+# Test image prediction
+banana = "NIND_banana_ISOH3.png"
+kibbles = "NIND_kibbles_ISOH3.png"
+library = "NIND_BruegelLibraryS1_NZ.png"
+parrots = "kodim23-noise-std51.png"
+eye = "eye_closeup_smaller_DIM25_noise_stddev_51.png"
+
+I_path = "/content/noi.jpg"
+
+img = cv2.imread(I_path)
+img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+img = cv2.resize(img, (256, 256))
+
+predicted_image = inf_s_img(model, img)
+predicted_image/=255
+
+f, ar = plt.subplots(1,2, figsize=(14,14))
+ar[0].imshow(img)
+ar[0].title.set_text("Noisy image")
+ar[0].set_axis_off()
+
+ar[1].imshow(predicted_image)
+ar[1].title.set_text("Predicted image")
+ar[1].set_axis_off()
+
+from skimage.metrics import peak_signal_noise_ratio
+
+predicted_images = inf_b_img(model, n_test_img)
+psnr_original_mean = 0
+psnr_prediction_mean = 0
+
+for gt_img, noisy_img, predicted_img in zip(g_test_img, n_test_img, predicted_images):
+    psnr_original_mean += peak_signal_noise_ratio(gt_img, noisy_img)
+    psnr_prediction_mean += peak_signal_noise_ratio(gt_img, predicted_img)
+
+psnr_original_mean/=g_test_img.shape[0]
+psnr_prediction_mean/=g_test_img.shape[0]
+print("Original average gt-noisy PSNR ->", psnr_original_mean)
+print("Predicted average gt-predicted PSNR ->", psnr_prediction_mean)
+
+from skimage.metrics import structural_similarity as ssim
+
+predicted_images = inf_b_img(model, n_test_img)
+ssim_original_mean = 0
+ssim_prediction_mean = 0
+
+for gt_img, noisy_img, predicted_img in zip(g_test_img, n_test_img, predicted_images):
+    ssim_original_mean += ssim(gt_img, noisy_img, multichannel=True, data_range=noisy_img.max() - noisy_img.min())
+    ssim_prediction_mean += ssim(gt_img, predicted_img, multichannel=True, data_range=predicted_img.max() - predicted_img.min())
+
+ssim_original_mean/=g_test_img.shape[0]
+ssim_prediction_mean/=g_test_img.shape[0]
+print("Original average gt-noisy SSIM ->", ssim_original_mean)
+print("Predicted average gt-predicted SSIM ->", ssim_prediction_mean)
+
+from prettytable import PrettyTable
+
+pt = PrettyTable()
+print("Note: Improvements shown are over original pairs")
+pt.field_names = ["Model", "PSNR", "SSIM", "PSNR Improvement", "SSIM improvement"]
+
+pt.add_row(["Original X-y pairs (No Model)","26.3779","0.6000", "-", "-"])
+pt.add_row(["REDNet (Baseline)","30.5713","0.7932", "4.1934","0.1932"])
+pt.add_row(["MWCNN (using Wavelets)","32.5220","0.8397","6.1441","0.2397"])
+pt.add_row(["PRIDNet (using Attention)","33.3105","0.8534","6.9326","0.2534"])
+
+print(pt)
