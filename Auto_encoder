@@ -1,0 +1,42 @@
+train = pd.read_csv("train.csv")
+test = pd.read_csv("test.csv")
+
+y = train["label"]
+x = train.drop(labels = ["label"], axis = 1)
+graph = sns.countplot(y)
+
+X = x.to_numpy()
+Y = y.to_numpy()
+X = X.astype('float')/255.
+x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size = 0.2, random_state = 21)
+
+x_train_noisy = x_train + np.random.rand(len(x_train), 784) * 0.9
+x_test_noisy = x_test + np.random.rand(len(x_test), 784) * 0.9
+x_train_noisy = np.clip(x_train_noisy, 0, 1)
+x_test_noisy = np.clip(x_test_noisy, 0, 1)
+
+def plot(x, p , labels = False):
+    plt.figure(figsize = (20,2))
+    for i in range(10):
+        plt.subplot(1, 10, i+1)
+        plt.imshow(x[i].reshape(28,28), cmap = 'binary')
+        if labels:
+            plt.xlabel(np.argmax(p[i]))
+    plt.show()
+    return
+plot(x_train, "Normal")
+plot(x_train_noisy, "Noisy")
+
+model = Sequential([Dense(1024, activation = 'relu', input_shape = (784, )),
+    Dense(512, activation = 'relu'),
+    Dense(256, activation = 'relu'),
+    Dense(10, activation = 'softmax')])
+model.compile(loss = 'sparse_categorical_crossentropy', optimizer = 'adam', metrics = 'accuracy')
+
+model.summary()
+
+model.fit(x_train, y_train, epochs = 20, batch_size = 512)
+
+loss, acc = model.evaluate(x_test, y_test)
+
+loss, acc = model.evaluate(x_test_noisy, y_test)
